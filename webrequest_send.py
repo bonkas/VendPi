@@ -15,7 +15,7 @@
 #  > /dev/ttyUSB0
 
 # Example usage of the script:
-# python webrequest-test_v0.2.py --url https://n8n.webhook.url --username '' --password '' --serial-port /dev/ttyUSB0 --baudrate 112500
+# python webrequest-test_v0.2.py --url https://n8n.webhook.url --username '' --password '' --serial-port /dev/ttyUSB0 --baudrate 115200
 
 import serial
 import requests
@@ -73,12 +73,17 @@ def main():
     while True:
         try:
             if ser.in_waiting > 0:
-                raw = ser.readline().decode('utf-8', errors='ignore').rstrip("\r\n")
+                raw_bytes = ser.readline()
+                if args.debug:
+                    logging.info(f"[RAW BYTES] {raw_bytes}")
+                raw = raw_bytes.decode('utf-8', errors='ignore').rstrip("\r\n")
                 if raw:
                     buffer.append(raw)
                     last_read = time.time()
                     if args.debug:
                         logging.info(f"[SERIAL] {raw}")
+                elif args.debug:
+                    logging.info(f"[EMPTY LINE] After stripping: '{raw}'")
             # If we have all data required, send it. We can check this by looking at the first and last line of the buffer.
             if buffer and buffer[0].startswith("AT+WOPEN") and buffer[-1].startswith("AT+CMGR"):
                 full_message = "\n".join(buffer)
