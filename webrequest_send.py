@@ -1,21 +1,15 @@
-# Script to accept data from /dev/ttyUSB0 and send it as a POST request to a specified URL
+"""VendPi serial packet collector → webhook sender.
 
-# v0.1 Initial functionality of script tested
-# v0.2 Updated to support multiline data
+Purpose:
+- Replace a legacy 3G/SMS modem with a Raspberry Pi reading RS‑232 serial.
+- Detect message boundaries using configurable start/end markers.
+- Post captured packets as JSON to a webhook for downstream processing (e.g., email via n8n).
 
-# Example json to send to webhook:
-#
-#{
-#  "timestamp": "2025-01-19T13:45:10.251Z",
-#  "data": "AT+WOPEN=0\nATE0\nAT\nAT+CMGS=<redacted>\n07/11/25 - 14:40\nSN NUMBER:017196\nTEMP         5.3\nLITRI 265159.467\nEURO    60544.50\nAT+CMGD=1,4\nATH\nAT+CMGR=1"
-#}
-#
-# Example usage to pipe data to serial port from terminal:
-# printf "AT+WOPEN=0\r\nATE0\r\nAT\r\nAT+CMGS=<redacted>\r\n07/11/25 - 14:40\r\nSN NUMBER:017196\r\nTEMP         5.3\r\nLITRI 265159.467\r\nEURO    60544.50\r\nAT+CMGD=1,4\r\nATH\r\nAT+CMGR=1\r\n" \
-#  > /dev/ttyUSB0
-
-# Example usage of the script:
-# python webrequest-test_v0.2.py --url https://n8n.webhook.url --username '' --password '' --serial-port /dev/ttyUSB0 --baudrate 115200
+See README.md for:
+- Sample message format and hardware setup
+- All CLI parameters with defaults
+- Virtual serial port testing and troubleshooting
+"""
 
 import serial
 import requests
