@@ -53,6 +53,10 @@ def parse_arguments():
     parser.add_argument('--baudrate', type=int, default=9600, help='Baud rate for the serial connection.')
     parser.add_argument('--insecure', action='store_true', help='Disable SSL certificate verification.')
     parser.add_argument('--debug', action='store_true', help='Enable real-time display of incoming serial data.')
+    parser.add_argument('--start-marker', default='AT+WOPEN', help='Marker indicating start of a packet.')
+    parser.add_argument('--end-marker', default='AT+CMGR', help='Marker indicating end of a packet.')
+    parser.add_argument('--packet-timeout', type=float, default=2.0, help='Seconds to wait after start before flushing if end not seen.')
+    parser.add_argument('--strip-nulls', action='store_true', help='Remove null bytes from input before processing.')
     return parser.parse_args()
 
 def main():
@@ -76,7 +80,9 @@ def main():
         sys.exit(1)
 
     buffer = []
-    last_read = time.time()
+    collecting = False
+    started_at = None
+    heartbeat_last = 0.0
 
     while True:
         try:
@@ -84,38 +90,107 @@ def main():
                 raw_bytes = ser.readline()
                 if args.debug:
                     logging.info(f"[RAW BYTES] {raw_bytes}")
-                raw = raw_bytes.decode('utf-8', errors='ignore').rstrip("\r\n")
-                if raw:
-                    buffer.append(raw)
-                    last_read = time.time()
-                    if args.debug:
-                        logging.info(f"[SERIAL] {raw}")
-                elif args.debug:
-                    logging.info(f"[EMPTY LINE] After stripping: '{raw}'")
-            # If we have all data required, send it. We can check this by looking at the first and last line of the buffer.
-            if buffer and buffer[0].startswith("AT+WOPEN") and buffer[-1].startswith("AT+CMGR"):
-                full_message = "\n".join(buffer)
-                buffer = []  # clear buffer
+                decoded = raw_bytes.decode('utf-8', errors='ignore')
+                if args.strip_nulls:
+                    decoded = decoded.replace('\x00', '')
+                line = decoded.rstrip("\r\n")
 
-                payload = {
-                    'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'data': full_message
-                }
+                if args.debug and (line or decoded):
+                    logging.info(f"[SERIAL] '{line}'")
 
-                headers = {'Content-Type': 'application/json'}
+                if not line:
+                    # Ignore empty lines
+                    pass
+                else:
+                    # State machine for packet detection
+                    if not collecting:
+                        # Look for start marker anywhere in line
+                        if args.start_marker in line:
+                            collecting = True
+                            started_at = time.time()
+                            buffer = [line]
+                            if args.debug:
+                                logging.info("[PACKET] Start detected")
+                        else:
+                            # Not part of packet; ignore or log
+                            if args.debug:
+                                logging.info("[PACKET] Not started; ignoring line")
+                    else:
+                        # Already collecting
+                        # If another start marker appears, reset packet to avoid mixing
+                        if args.start_marker in line:
+                            buffer = [line]
+                            started_at = time.time()
+                            if args.debug:
+                                logging.info("[PACKET] Restart detected; buffer reset")
+                        else:
+                            buffer.append(line)
 
-                logging.info("Sending packet:\n" + full_message)
+                        # End condition
+                        if args.end_marker in line:
+                            full_message = "\n".join(buffer)
+                            payload = {
+                                'timestamp': datetime.now(timezone.utc).isoformat(),
+                                'data': full_message
+                            }
+                            headers = {'Content-Type': 'application/json'}
 
-                response = requests.post(
-                    args.url,
-                    data=json.dumps(payload),
-                    headers=headers,
-                    auth=auth,
-                    verify=not args.insecure,
-                    timeout=10
-                )
-                response.raise_for_status()
-                logging.info(f"Packet sent successfully (HTTP {response.status_code})")
+                            logging.info("Sending packet:\n" + full_message)
+                            try:
+                                response = requests.post(
+                                    args.url,
+                                    data=json.dumps(payload),
+                                    headers=headers,
+                                    auth=auth,
+                                    verify=not args.insecure,
+                                    timeout=10
+                                )
+                                response.raise_for_status()
+                                logging.info(f"Packet sent successfully (HTTP {response.status_code})")
+                            except RequestException as e:
+                                logging.error(f"HTTP request failed: {e}")
+
+                            # Reset state after send
+                            buffer = []
+                            collecting = False
+                            started_at = None
+
+                # Debug heartbeat: log remaining timeout while collecting
+                if collecting and started_at and args.debug:
+                    now = time.time()
+                    remaining = max(0.0, args.packet_timeout - (now - started_at))
+                    # Log at ~0.5s intervals to avoid spam
+                    if now - heartbeat_last >= 0.5:
+                        logging.info(f"[TIMEOUT] remaining {remaining:.2f}s, buffer size {len(buffer)}")
+                        heartbeat_last = now
+
+                # Timeout flush: if collecting for too long without end marker
+                if collecting and started_at and (time.time() - started_at > args.packet_timeout):
+                    full_message = "\n".join(buffer)
+                    payload = {
+                        'timestamp': datetime.now(timezone.utc).isoformat(),
+                        'data': full_message
+                    }
+                    headers = {'Content-Type': 'application/json'}
+
+                    logging.info("Packet timeout reached. Sending partial packet:\n" + full_message)
+                    try:
+                        response = requests.post(
+                            args.url,
+                            data=json.dumps(payload),
+                            headers=headers,
+                            auth=auth,
+                            verify=not args.insecure,
+                            timeout=10
+                        )
+                        response.raise_for_status()
+                        logging.info(f"Partial packet sent (HTTP {response.status_code})")
+                    except RequestException as e:
+                        logging.error(f"HTTP request failed: {e}")
+
+                    buffer = []
+                    collecting = False
+                    started_at = None
 
             # If no new data for 0.2 seconds AND buffer has content → send packet
             # NO LONGER USED! Replaced with above to check for start/end lines
