@@ -1,10 +1,12 @@
 # VendPi
 
 ## Overview
-Scripts for reading data from serial ports and sending to webhooks.
+Scripts for bridging a vending machine's serial output to modern web services. The Raspberry Pi reads the machine's serial data and forwards complete messages to a webhook, where an external workflow (e.g., n8n) parses the content and sends an email.
 
 ## Purpose
-This project converts a legacy vending machine that originally sent SMS messages into a system that triggers an email via a webhook. The machine communicates through a 3G serial modem using AT commands. We detect when a full message has been transmitted, capture it, and forward the data to a webhook that handles email delivery.
+This project replaces the machine's aging 3G/SMS modem with a Raspberry Pi connected to the serial port. As 3G service is retired, the Pi acts as a drop-in replacement: it listens to the same AT-command driven serial traffic, extracts the meaningful message, and posts it to a webhook so an external service can deliver the content via email.
+
+External processing is intentionally decoupled. We use n8n in our setup to split the data and send emails, but any workflow engine or webhook consumer can be used.
 
 ## Sample Message
 The data we care about looks like this:
@@ -24,7 +26,7 @@ ATH
 AT+CMGR=1
 ```
 
-The machine issues AT commands to open the modem session and send the payload. This project uses those AT markers to detect the start and end of a message, then posts the captured content to a webhook for email processing.
+The machine issues AT commands to open a modem session and send the payload. This project uses those AT markers to detect the start and end of a message, then posts the captured content to a webhook for downstream processing (such as emailing).
 
 ## Scripts
 
@@ -152,3 +154,70 @@ printf "AT+WOPEN=0\r\nATE0\r\nAT\r\nAT+CMGS=<redacted>\r\n07/11/25 - 14:40\r\nSN
 	This will show raw bytes, decoded text, and cleaned data for debugging.
 
 4. **Verify baud rate**: Make sure the baud rate matches your device (common rates: 9600, 115200)
+
+## Files
+- README.md: Project documentation, setup, testing, and troubleshooting.
+- webrequest_send.py: Reads serial, detects packets via start/end markers, applies idle timeout and max duration, and posts JSON to a webhook.
+- serial_data_test.py: Real-time serial monitor that prints raw bytes, decoded text, and cleaned lines for troubleshooting.
+- send_test_data.py: Sends test lines with CRLF and a configurable delay to a serial port to simulate device output.
+- sample_data.txt: Example captured serial output for reference/testing.
+
+## Hardware Setup
+
+Two common ways to connect the Raspberry Pi to the vending machine's serial interface:
+
+### Option A: USB-to-Serial Adapter (Recommended)
+- Use a reputable USB–RS‑232 adapter. Adapter tested: Unitek BF‑810Y (RS‑232).
+- Many vending machines expose RS‑232 via a standard DB9 connector.
+- Cable type matters:
+	- If the vending machine presents a DTE port (like a PC), use a null‑modem (cross‑over) cable between the adapter and the machine.
+	- If it presents a DCE port (like a modem), use a straight‑through cable.
+- Connect the adapter to the Pi’s USB port; the device will appear as `/dev/ttyUSB0`, `/dev/ttyUSB1`, etc.
+- Verify the port:
+	```bash
+	ls -la /dev/ttyUSB*
+	dmesg | grep -i tty
+	```
+- Baud rate: this project uses 115200 in production.
+ - Project-specific note: this vending machine is DTE, so a null‑modem (cross‑over) cable is required.
+- Run the receiver with the detected port:
+	```bash
+	python webrequest_send.py --url https://webhook.url --serial-port /dev/ttyUSB1 --baudrate 115200 --debug
+	```
+
+#### Cable selection tips
+- For this project: the machine is DTE → use a null‑modem (cross‑over) cable.
+- If you’re unsure whether another machine is DTE or DCE, try a straight‑through cable first; if you see no data, try a null‑modem cable.
+- Symptom of wrong cable: port opens fine, but no incoming data appears in the monitor.
+- Some machines label the DB9; if labeled “DTE”, use null‑modem. If labeled “DCE”, use straight‑through.
+
+### Option B: Raspberry Pi GPIO UART (Advanced)
+- Only use this if the vending machine outputs TTL (3.3V) UART. If it’s RS‑232 (±12V), add a level shifter (e.g., MAX3232) between the machine and the Pi GPIO.
+- Wiring (TTL UART):
+	- Pi `GPIO14` (TXD) ↔ Device RX
+	- Pi `GPIO15` (RXD) ↔ Device TX
+	- Common GND ↔ Device GND
+	- Never connect RS‑232 signals directly to GPIO without a level shifter.
+- Enable UART on the Pi:
+	```bash
+	sudo raspi-config
+	# Interface Options → Serial → Disable login shell over serial, Enable serial port hardware
+	```
+- The UART device appears as `/dev/serial0` (symlink to `/dev/ttyAMA0` or `/dev/ttyS0` depending on model):
+	```bash
+	ls -la /dev/serial0
+	```
+- Run the receiver using the GPIO UART:
+	```bash
+	python webrequest_send.py --url https://webhook.url --serial-port /dev/serial0 --baudrate 115200 --debug
+	```
+
+### Notes & Safety
+- Determine signal type before wiring: RS‑232 (±12V) vs TTL (3.3V). RS‑232 requires an adapter or level shifter.
+- Share ground between devices; avoid ground loops and long unshielded runs.
+- Confirm baud rate and framing (e.g., 8N1). Typical rates are 9600 or 115200.
+- On Linux, ensure the `dialout` group membership for serial access:
+	```bash
+	sudo usermod -a -G dialout $USER
+	# Log out and back in
+	```
