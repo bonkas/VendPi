@@ -61,8 +61,16 @@ def main():
     auth = HTTPBasicAuth(args.username, args.password) if args.username and args.password else None
 
     try:
-        ser = serial.Serial(port=args.serial_port, baudrate=args.baudrate, timeout=0.1)
+        ser = serial.Serial(
+            port=args.serial_port, 
+            baudrate=args.baudrate, 
+            timeout=0.1,
+            rtscts=False,
+            dsrdtr=False
+        )
         logging.info(f"Opened serial port {args.serial_port} at {args.baudrate} baud.")
+        if args.debug:
+            logging.info(f"[DEBUG] Port settings - timeout: {ser.timeout}, rtscts: {ser.rtscts}, dsrdtr: {ser.dsrdtr}")
     except SerialException as e:
         logging.error(f"Failed to open serial port: {e}")
         sys.exit(1)
