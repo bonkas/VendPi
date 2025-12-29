@@ -10,18 +10,27 @@ Reads data from a serial port and sends it as POST requests to a webhook URL.
 
 **Usage:**
 ```bash
-python webrequest_send.py --url https://webhook.url --serial-port /dev/ttyUSB1 --baudrate 115200 --debug
+python webrequest_send.py --url https://webhook.url \
+	--serial-port /dev/ttyUSB1 --baudrate 115200 \
+	--start-marker "AT+WOPEN" --end-marker "AT+CMGR" \
+	--packet-timeout 2.0 --max-packet-duration 10.0 \
+	--strip-nulls --debug
 ```
 
 **Arguments:**
 - `--url` (required): Webhook URL to send POST requests to
-- `--serial-port`: Serial port to read from (default: /dev/ttyUSB0)
-- `--baudrate`: Baud rate for serial connection (default: 9600)
+- `--serial-port`: Serial port to read from. Default: /dev/ttyUSB0
+- `--baudrate`: Baud rate for serial connection. Default: 9600
 - `--username`: Username for HTTP Basic Authentication
 - `--password`: Password for HTTP Basic Authentication
-- `--interval`: Polling interval in seconds (default: 1)
 - `--insecure`: Disable SSL certificate verification
+- `--interval`: Loop sleep in seconds to reduce CPU usage. Default: 0.01
 - `--debug`: Enable real-time display of incoming serial data
+- `--start-marker`: Substring indicating the start of a packet. Default: `AT+WOPEN`
+- `--end-marker`: Substring indicating the end of a packet. Default: `AT+CMGR`
+- `--packet-timeout`: Idle timeout (seconds). If no new lines arrive for this duration while collecting, the current packet is sent. Default: 2.0
+- `--max-packet-duration`: Absolute maximum duration (seconds) from the first start-marker to send, even if lines keep arriving. Prevents runaway packets when the end-marker is missing. Default: 10.0
+- `--strip-nulls`: Remove null bytes (\x00) before processing
 
 ### serial_data_test.py
 Monitor and display incoming serial port data in real-time for troubleshooting.
