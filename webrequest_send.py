@@ -233,32 +233,6 @@ def main():
                     started_at = None
                     last_activity = None
 
-            # If no new data for 0.2 seconds AND buffer has content → send packet
-            # NO LONGER USED! Replaced with above to check for start/end lines
-            """ if buffer and (time.time() - last_read > 0.2):
-                full_message = "\n".join(buffer)
-                buffer = []  # clear buffer
-
-                payload = {
-                    'timestamp': datetime.now(timezone.utc).isoformat(),
-                    'data': full_message
-                }
-
-                headers = {'Content-Type': 'application/json'}
-
-                logging.info("Sending packet:\n" + full_message)
-
-                response = requests.post(
-                    args.url,
-                    data=json.dumps(payload),
-                    headers=headers,
-                    auth=auth,
-                    verify=not args.insecure,
-                    timeout=10
-                )
-                response.raise_for_status()
-                logging.info(f"Packet sent successfully (HTTP {response.status_code})") """
-
             # Small sleep to avoid CPU spinning; keep loop responsive
             time.sleep(args.interval)
 
