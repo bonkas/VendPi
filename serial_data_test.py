@@ -43,12 +43,14 @@ def main():
             if ser.in_waiting > 0:
                 raw_bytes = ser.readline()
                 logging.info(f"[RAW BYTES] {raw_bytes}")
-                line = raw_bytes.decode('utf-8', errors='ignore').rstrip("\r\n")
+                decoded = raw_bytes.decode('utf-8', errors='ignore')
+                logging.info(f"[DECODED] '{decoded}'")
+                line = decoded.rstrip("\r\n")
                 if line:
                     timestamp = datetime.now(timezone.utc).isoformat()
-                    logging.info(f"[{timestamp}] {line}")
+                    logging.info(f"[DATA] {line}")
                 else:
-                    logging.info(f"[EMPTY LINE] After stripping")
+                    logging.info(f"[EMPTY LINE] After stripping whitespace")
 
             time.sleep(0.01)  # Small delay to prevent CPU spinning
 
