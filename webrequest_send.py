@@ -52,6 +52,7 @@ def parse_arguments():
     parser.add_argument('--serial-port', default='/dev/ttyUSB0', help='Serial port to read from.')
     parser.add_argument('--baudrate', type=int, default=9600, help='Baud rate for the serial connection.')
     parser.add_argument('--insecure', action='store_true', help='Disable SSL certificate verification.')
+    parser.add_argument('--debug', action='store_true', help='Enable real-time display of incoming serial data.')
     return parser.parse_args()
 
 def main():
@@ -76,6 +77,8 @@ def main():
                 if raw:
                     buffer.append(raw)
                     last_read = time.time()
+                    if args.debug:
+                        logging.info(f"[SERIAL] {raw}")
             # If we have all data required, send it. We can check this by looking at the first and last line of the buffer.
             if buffer and buffer[0].startswith("AT+WOPEN") and buffer[-1].startswith("AT+CMGR"):
                 full_message = "\n".join(buffer)
