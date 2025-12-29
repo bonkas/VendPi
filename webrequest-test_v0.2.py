@@ -17,7 +17,6 @@
 # Example usage of the script:
 # python webrequest-test_v0.2.py --url https://n8n.webhook.url --username '' --password '' --serial-port /dev/ttyUSB0 --baudrate 112500
 
-
 import serial
 import requests
 import time
@@ -77,9 +76,8 @@ def main():
                 if raw:
                     buffer.append(raw)
                     last_read = time.time()
-
-            # If no new data for 0.2 seconds AND buffer has content → send packet
-            if buffer and (time.time() - last_read > 0.2):
+            # If we have all data required, send it. We can check this by looking at the first and last line of the buffer.
+            if buffer and buffer[0].startswith("AT+WOPEN") and buffer[-1].startswith("AT+CMGR"):
                 full_message = "\n".join(buffer)
                 buffer = []  # clear buffer
 
