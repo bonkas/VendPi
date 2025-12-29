@@ -3,6 +3,29 @@
 ## Overview
 Scripts for reading data from serial ports and sending to webhooks.
 
+## Purpose
+This project converts a legacy vending machine that originally sent SMS messages into a system that triggers an email via a webhook. The machine communicates through a 3G serial modem using AT commands. We detect when a full message has been transmitted, capture it, and forward the data to a webhook that handles email delivery.
+
+## Sample Message
+The data we care about looks like this:
+
+```
+AT+WOPEN=0
+ATE0
+AT
+AT+CMGS=<redacted>
+07/11/25 - 14:40
+SN NUMBER:<redacted>
+TEMP         5.3
+LITRI 265159.467
+EURO    60544.50
+AT+CMGD=1,4
+ATH
+AT+CMGR=1
+```
+
+The machine issues AT commands to open the modem session and send the payload. This project uses those AT markers to detect the start and end of a message, then posts the captured content to a webhook for email processing.
+
 ## Scripts
 
 ### webrequest_send.py
@@ -31,6 +54,24 @@ python webrequest_send.py --url https://webhook.url \
 - `--packet-timeout`: Idle timeout (seconds). If no new lines arrive for this duration while collecting, the current packet is sent. Default: 2.0
 - `--max-packet-duration`: Absolute maximum duration (seconds) from the first start-marker to send, even if lines keep arriving. Prevents runaway packets when the end-marker is missing. Default: 10.0
 - `--strip-nulls`: Remove null bytes (\x00) before processing
+
+**How detection works:**
+- Start when a line contains the start marker (default `AT+WOPEN`).
+- Collect all subsequent lines until a line contains the end marker (default `AT+CMGR`).
+- If a new start marker appears mid-collection, reset the buffer to avoid mixing packets.
+- Idle timeout (`--packet-timeout`): if no new lines arrive while collecting for N seconds, send the partial packet.
+- Max duration (`--max-packet-duration`): absolute cap from first start; send even if lines keep arriving.
+- Optional sanitization: `--strip-nulls` removes `\x00` before decoding/processing.
+
+**Webhook payload:**
+The script posts JSON to the webhook:
+
+```json
+{
+	"timestamp": "2025-01-19T13:45:10.251Z",
+	"data": "AT+WOPEN=0\nATE0\nAT\nAT+CMGS=<redacted>\n...\nAT+CMGR=1"
+}
+```
 
 ### serial_data_test.py
 Monitor and display incoming serial port data in real-time for troubleshooting.
