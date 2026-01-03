@@ -48,7 +48,7 @@ def parse_arguments():
     parser.add_argument('--baudrate', type=int, default=9600, help='Baud rate for the serial connection.')
     parser.add_argument('--insecure', action='store_true', help='Disable SSL certificate verification.')
     parser.add_argument('--debug', action='store_true', help='Enable real-time display of incoming serial data.')
-    parser.add_argument('--start-marker', default='AT+WOPEN', help='Substring that indicates the start of a packet. Default: AT+WOPEN')
+    parser.add_argument('--start-marker', default='AT+CMGS', help='Substring that indicates the start of a packet. Default: AT+CMGS')
     parser.add_argument('--end-marker', default='ATH', help='Substring that indicates the end of a packet. Default: ATH')
     # Timeouts
     # packet-timeout: Idle-based. If we are collecting and no new line arrives for this many seconds, send whatever we have.
