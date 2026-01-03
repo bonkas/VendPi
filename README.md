@@ -36,7 +36,7 @@ Reads data from a serial port and sends it as POST requests to a webhook URL.
 **Usage:**
 ```bash
 python webrequest_send.py --url https://webhook.url \
-	--serial-port /dev/ttyUSB1 --baudrate 115200 \
+	--serial-port /dev/ttyUSB1 --baudrate 9600 \
 	--start-marker "AT+WOPEN" --end-marker "AT+CMGR" \
 	--packet-timeout 2.0 --max-packet-duration 10.0 \
 	--strip-nulls --debug
@@ -80,7 +80,7 @@ Monitor and display incoming serial port data in real-time for troubleshooting.
 
 **Usage:**
 ```bash
-python serial_data_test.py --serial-port /dev/ttyUSB1 --baudrate 115200
+python serial_data_test.py --serial-port /dev/ttyUSB1 --baudrate 9600
 ```
 
 ### send_test_data.py
@@ -88,7 +88,7 @@ Send test data to a serial port for testing purposes.
 
 **Usage:**
 ```bash
-python send_test_data.py --serial-port /dev/ttyUSB1 --baudrate 115200
+python send_test_data.py --serial-port /dev/ttyUSB1 --baudrate 9600
 ```
 
 ## Testing with Virtual Serial Ports
@@ -115,12 +115,12 @@ You can test the scripts without physical hardware using virtual serial port pai
 
 3. **In one terminal, run your receiver script**:
 	```bash
-	python webrequest_send.py --url https://webhook.url --serial-port /dev/pts/2 --baudrate 115200
+	python webrequest_send.py --url https://webhook.url --serial-port /dev/pts/2 --baudrate 9600
 	```
 
 4. **In another terminal, send test data**:
 	```bash
-	python send_test_data.py --serial-port /dev/pts/3 --baudrate 115200
+	python send_test_data.py --serial-port /dev/pts/3 --baudrate 9600
 	```
 
 The data sent to `/dev/pts/3` will appear on `/dev/pts/2` and be processed by your script.
@@ -149,7 +149,7 @@ printf "AT+WOPEN=0\r\nATE0\r\nAT\r\nAT+CMGS=<redacted>\r\n07/11/25 - 14:40\r\nSN
 
 3. **Use the test monitor script**:
 	```bash
-	python serial_data_test.py --serial-port /dev/ttyUSB1 --baudrate 115200
+	python serial_data_test.py --serial-port /dev/ttyUSB1 --baudrate 9600
 	```
 	This will show raw bytes, decoded text, and cleaned data for debugging.
 
@@ -178,11 +178,11 @@ Two common ways to connect the Raspberry Pi to the vending machine's serial inte
 	ls -la /dev/ttyUSB*
 	dmesg | grep -i tty
 	```
-- Baud rate: this project uses 115200 in production.
+- Baud rate: this project uses 9600 in production (recently verified; using 115200 produced only null bytes/break conditions).
  - Project-specific note: this vending machine is DTE, so a null‑modem (cross‑over) cable is required.
 - Run the receiver with the detected port:
 	```bash
-	python webrequest_send.py --url https://webhook.url --serial-port /dev/ttyUSB1 --baudrate 115200 --debug
+	python webrequest_send.py --url https://webhook.url --serial-port /dev/ttyUSB1 --baudrate 9600 --debug
 	```
 
 #### Cable selection tips
@@ -209,13 +209,13 @@ Two common ways to connect the Raspberry Pi to the vending machine's serial inte
 	```
 - Run the receiver using the GPIO UART:
 	```bash
-	python webrequest_send.py --url https://webhook.url --serial-port /dev/serial0 --baudrate 115200 --debug
+	python webrequest_send.py --url https://webhook.url --serial-port /dev/serial0 --baudrate 9600 --debug
 	```
 
 ### Notes & Safety
 - Determine signal type before wiring: RS‑232 (±12V) vs TTL (3.3V). RS‑232 requires an adapter or level shifter.
 - Share ground between devices; avoid ground loops and long unshielded runs.
-- Confirm baud rate and framing (e.g., 8N1). Typical rates are 9600 or 115200.
+- Confirm baud rate and framing (e.g., 8N1). For this machine 9600 works; typical rates are 9600 or 115200.
 - On Linux, ensure the `dialout` group membership for serial access:
 	```bash
 	sudo usermod -a -G dialout $USER

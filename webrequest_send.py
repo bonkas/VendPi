@@ -49,12 +49,12 @@ def parse_arguments():
     parser.add_argument('--insecure', action='store_true', help='Disable SSL certificate verification.')
     parser.add_argument('--debug', action='store_true', help='Enable real-time display of incoming serial data.')
     parser.add_argument('--start-marker', default='AT+WOPEN', help='Substring that indicates the start of a packet. Default: AT+WOPEN')
-    parser.add_argument('--end-marker', default='AT+CMGR', help='Substring that indicates the end of a packet. Default: AT+CMGR')
+    parser.add_argument('--end-marker', default='ATH', help='Substring that indicates the end of a packet. Default: ATH')
     # Timeouts
     # packet-timeout: Idle-based. If we are collecting and no new line arrives for this many seconds, send whatever we have.
-    parser.add_argument('--packet-timeout', type=float, default=2.0, help='Idle timeout (seconds). If no new lines arrive for this duration while collecting, send the current packet. Default: 2.0')
+    parser.add_argument('--packet-timeout', type=float, default=5.0, help='Idle timeout (seconds). If no new lines arrive for this duration while collecting, send the current packet. Default: 2.0')
     # max-packet-duration: Absolute cap. Even if lines keep arriving, do not collect longer than this many seconds from start.
-    parser.add_argument('--max-packet-duration', type=float, default=10.0, help='Absolute maximum duration (seconds) from start-marker to send. Prevents runaway packets if end-marker never arrives. Default: 10.0')
+    parser.add_argument('--max-packet-duration', type=float, default=30.0, help='Absolute maximum duration (seconds) from start-marker to send. Prevents runaway packets if end-marker never arrives. Default: 10.0')
     parser.add_argument('--strip-nulls', action='store_true', help='Remove null bytes (\\x00) from input before processing.')
     return parser.parse_args()
 
