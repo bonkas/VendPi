@@ -56,7 +56,7 @@ python webrequest_send.py --url https://webhook.url \
 - `--packet-timeout`: Idle timeout (seconds). If no new lines arrive for this duration while collecting, the current packet is sent. Default: 2.0
 - `--max-packet-duration`: Absolute maximum duration (seconds) from the first start-marker to send, even if lines keep arriving. Prevents runaway packets when the end-marker is missing. Default: 10.0
 - `--strip-nulls`: Remove null bytes (\x00) before processing
-- `--cooldown`: Cooldown period (seconds) after sending a packet during which incoming data is ignored. Helps prevent duplicate messages. Default: 2.0
+- `--cooldown`: Cooldown period (seconds) after sending a packet during which incoming data is ignored. Helps prevent duplicate messages. Default: 0.0 (disabled)
 
 **How detection works:**
 - Start when a line contains the start marker (default `AT+WOPEN`).
@@ -67,12 +67,12 @@ python webrequest_send.py --url https://webhook.url \
 - Optional sanitization: `--strip-nulls` removes `\x00` before decoding/processing.
 
 **Cooldown mechanism:**
-- After a packet is successfully sent, a cooldown period begins (default: 2.0 seconds, configurable via `--cooldown`).
+- After a packet is successfully sent, a cooldown period begins if configured (configurable via `--cooldown`).
 - During the cooldown period, all incoming serial data is dropped and ignored.
 - This prevents duplicate messages that sometimes occur when serial data arrives twice.
 - The cooldown applies to all packet send scenarios: normal completion, idle timeout, and max duration.
 - When `--debug` is enabled, dropped data is logged with remaining cooldown time.
-- To disable cooldown, use `--cooldown 0`.
+- Cooldown is disabled by default (0.0). Enable it by setting `--cooldown` to a positive value (e.g., 2.0 for 2 seconds).
 
 **Webhook payload:**
 The script posts JSON to the webhook:
