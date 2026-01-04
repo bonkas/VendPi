@@ -56,6 +56,8 @@ def parse_arguments():
     # max-packet-duration: Absolute cap. Even if lines keep arriving, do not collect longer than this many seconds from start.
     parser.add_argument('--max-packet-duration', type=float, default=30.0, help='Absolute maximum duration (seconds) from start-marker to send. Prevents runaway packets if end-marker never arrives. Default: 10.0')
     parser.add_argument('--strip-nulls', action='store_true', help='Remove null bytes (\\x00) from input before processing.')
+    # Cooldown: Prevent duplicate packets by ignoring incoming data for a period after sending
+    parser.add_argument('--cooldown', type=float, default=2.0, help='Cooldown period (seconds) after sending a packet during which incoming data is ignored. Helps prevent duplicate messages. Default: 2.0')
     return parser.parse_args()
 
 def main():
@@ -83,9 +85,13 @@ def main():
     started_at = None
     last_activity = None
     heartbeat_last = 0.0
+    last_sent_time = 0.0  # Track when last packet was sent for cooldown
 
     while True:
         try:
+            # Check if we're in cooldown period
+            in_cooldown = (time.time() - last_sent_time) < args.cooldown
+            
             if ser.in_waiting > 0:
                 raw_bytes = ser.readline()
                 if args.debug:
@@ -97,6 +103,13 @@ def main():
 
                 if args.debug and (line or decoded):
                     logging.info(f"[SERIAL] '{line}'")
+                
+                # Drop incoming data during cooldown period
+                if in_cooldown:
+                    if args.debug and line:
+                        remaining_cooldown = args.cooldown - (time.time() - last_sent_time)
+                        logging.info(f"[COOLDOWN] Dropping data (cooldown active for {remaining_cooldown:.2f}s more): '{line}'")
+                    continue
 
                 if not line:
                     # Ignore empty lines
@@ -151,6 +164,10 @@ def main():
                                 )
                                 response.raise_for_status()
                                 logging.info(f"Packet sent successfully (HTTP {response.status_code})")
+                                # Start cooldown period
+                                last_sent_time = time.time()
+                                if args.debug:
+                                    logging.info(f"[COOLDOWN] Cooldown period started ({args.cooldown}s)")
                             except RequestException as e:
                                 logging.error(f"HTTP request failed: {e}")
 
@@ -190,6 +207,10 @@ def main():
                         )
                         response.raise_for_status()
                         logging.info(f"Partial packet sent (HTTP {response.status_code})")
+                        # Start cooldown period
+                        last_sent_time = time.time()
+                        if args.debug:
+                            logging.info(f"[COOLDOWN] Cooldown period started ({args.cooldown}s)")
                     except RequestException as e:
                         logging.error(f"HTTP request failed: {e}")
 
@@ -219,6 +240,10 @@ def main():
                         )
                         response.raise_for_status()
                         logging.info(f"Packet sent (HTTP {response.status_code}) due to max duration")
+                        # Start cooldown period
+                        last_sent_time = time.time()
+                        if args.debug:
+                            logging.info(f"[COOLDOWN] Cooldown period started ({args.cooldown}s)")
                     except RequestException as e:
                         logging.error(f"HTTP request failed: {e}")
 
