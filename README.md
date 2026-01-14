@@ -333,3 +333,11 @@ sudo systemctl restart vendpi.service
 # Stop the service
 sudo systemctl stop vendpi.service
 ```
+
+## To-Do / Future Enhancements
+
+- [ ] **Persistent device name with udev rules** - Create a udev rule to give the USB-to-serial adapter a consistent symlink (e.g., `/dev/vendpi`) regardless of which USB port it's plugged into. This prevents issues when the device enumerates as `/dev/ttyUSB0` vs `/dev/ttyUSB1`.
+
+- [ ] **Auto-detection of serial port** - Use `pyserial`'s `serial.tools.list_ports` module to automatically find the correct serial adapter by vendor ID, product ID, or description, rather than requiring a hardcoded device path.
+
+- [ ] **Reconnection on disconnect** - Add logic to detect when the USB-to-serial adapter is unplugged and automatically reconnect when it's plugged back in, rather than requiring a service restart.
