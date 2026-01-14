@@ -263,6 +263,8 @@ sudo chown root:root /etc/vendpi.env
 sudo chmod 600 /etc/vendpi.env
 ```
 
+**Note:** The environment variables (`WEBHOOK_URL`, `VENDPI_USERNAME`, `VENDPI_PASSWORD`) are only loaded automatically when running as a systemd service. When running the Python script manually, you must pass `--url`, `--username`, and `--password` as command line arguments.
+
 ### 3. Create the service file
 
 Create the systemd service unit:
@@ -285,9 +287,6 @@ EnvironmentFile=/etc/vendpi.env
 Restart=always
 RestartSec=10
 ExecStart=/usr/bin/python3 /home/pi/VendPi/webrequest_send.py \
-  --url ${WEBHOOK_URL} \
-  --username ${VENDPI_USERNAME} \
-  --password ${VENDPI_PASSWORD} \
   --serial-port /dev/ttyUSB1 \
   --baudrate 9600 \
   --cooldown 120
