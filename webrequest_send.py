@@ -40,7 +40,7 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Read from a serial port and send captured packets as POST requests.')
-    parser.add_argument('--url', required=True, help='The URL to send POST requests to.')
+    parser.add_argument('--url', help='The URL to send POST requests to. Can also be set via WEBHOOK_URL environment variable.')
     parser.add_argument('--username', help='Username for HTTP Basic Authentication.')
     parser.add_argument('--password', help='Password for HTTP Basic Authentication.')
     # Loop tuning: small sleep to avoid CPU spin but keep responsiveness
@@ -65,14 +65,23 @@ def main():
     args = parse_arguments()
 
     # Check environment variables first, fall back to CLI args
+    webhook_url = os.environ.get('WEBHOOK_URL') or args.url
     username = os.environ.get('VENDPI_USERNAME') or args.username
     password = os.environ.get('VENDPI_PASSWORD') or args.password
+
+    # Validate that we have a URL
+    if not webhook_url:
+        logging.error("No webhook URL provided. Set WEBHOOK_URL environment variable or use --url argument.")
+        sys.exit(1)
+
+    url_source = "environment variable" if os.environ.get('WEBHOOK_URL') else "command line argument"
+    logging.info(f"Webhook URL loaded from {url_source}")
 
     auth = HTTPBasicAuth(username, password) if username and password else None
 
     if auth:
-        source = "environment variables" if os.environ.get('VENDPI_USERNAME') else "command line arguments"
-        logging.info(f"Using HTTP Basic Authentication (credentials from {source})")
+        cred_source = "environment variables" if os.environ.get('VENDPI_USERNAME') else "command line arguments"
+        logging.info(f"Using HTTP Basic Authentication (credentials from {cred_source})")
 
     try:
         ser = serial.Serial(
@@ -164,7 +173,7 @@ def main():
                             logging.info("Sending packet:\n" + full_message)
                             try:
                                 response = requests.post(
-                                    args.url,
+                                    webhook_url,
                                     data=json.dumps(payload),
                                     headers=headers,
                                     auth=auth,
@@ -207,7 +216,7 @@ def main():
                     logging.info("Idle timeout reached. Sending partial packet:\n" + full_message)
                     try:
                         response = requests.post(
-                            args.url,
+                            webhook_url,
                             data=json.dumps(payload),
                             headers=headers,
                             auth=auth,
@@ -240,7 +249,7 @@ def main():
                     logging.info("Max packet duration reached. Sending packet:\n" + full_message)
                     try:
                         response = requests.post(
-                            args.url,
+                            webhook_url,
                             data=json.dumps(payload),
                             headers=headers,
                             auth=auth,
