@@ -57,7 +57,7 @@ def parse_arguments():
     parser.add_argument('--max-packet-duration', type=float, default=30.0, help='Absolute maximum duration (seconds) from start-marker to send. Prevents runaway packets if end-marker never arrives. Default: 10.0')
     parser.add_argument('--strip-nulls', action='store_true', help='Remove null bytes (\\x00) from input before processing.')
     # Cooldown: Prevent duplicate packets by ignoring incoming data for a period after sending
-    parser.add_argument('--cooldown', type=float, default=0.0, help='Cooldown period (seconds) after sending a packet during which incoming data is ignored. Helps prevent duplicate messages. Default: 0.0')
+    parser.add_argument('--cooldown', type=float, default=120.0, help='Cooldown period (seconds) after sending a packet during which incoming data is ignored. Helps prevent duplicate messages. Default: 120.0')
     return parser.parse_args()
 
 def main():

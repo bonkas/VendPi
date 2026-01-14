@@ -8,7 +8,7 @@ import argparse
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Send test data to serial port.')
     parser.add_argument('--serial-port', default='/dev/ttyUSB0', help='Serial port to write to.')
-    parser.add_argument('--baudrate', type=int, default=115200, help='Baud rate for the serial connection.')
+    parser.add_argument('--baudrate', type=int, default=9600, help='Baud rate for the serial connection.')
     parser.add_argument('--delay', type=float, default=0.1, help='Delay between lines in seconds.')
     return parser.parse_args()
 

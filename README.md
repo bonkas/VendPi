@@ -37,8 +37,8 @@ Reads data from a serial port and sends it as POST requests to a webhook URL.
 ```bash
 python webrequest_send.py --url https://webhook.url \
 	--serial-port /dev/ttyUSB1 --baudrate 9600 \
-	--start-marker "AT+WOPEN" --end-marker "AT+CMGR" \
-	--packet-timeout 2.0 --max-packet-duration 10.0 \
+	--start-marker "AT+CMGS" --end-marker "ATH" \
+	--packet-timeout 5.0 --max-packet-duration 30.0 \
 	--strip-nulls --debug
 ```
 
@@ -51,28 +51,28 @@ python webrequest_send.py --url https://webhook.url \
 - `--insecure`: Disable SSL certificate verification
 - `--interval`: Loop sleep in seconds to reduce CPU usage. Default: 0.01
 - `--debug`: Enable real-time display of incoming serial data
-- `--start-marker`: Substring indicating the start of a packet. Default: `AT+WOPEN`
-- `--end-marker`: Substring indicating the end of a packet. Default: `AT+CMGR`
-- `--packet-timeout`: Idle timeout (seconds). If no new lines arrive for this duration while collecting, the current packet is sent. Default: 2.0
-- `--max-packet-duration`: Absolute maximum duration (seconds) from the first start-marker to send, even if lines keep arriving. Prevents runaway packets when the end-marker is missing. Default: 10.0
+- `--start-marker`: Substring indicating the start of a packet. Default: `AT+CMGS`
+- `--end-marker`: Substring indicating the end of a packet. Default: `ATH`
+- `--packet-timeout`: Idle timeout (seconds). If no new lines arrive for this duration while collecting, the current packet is sent. Default: 5.0
+- `--max-packet-duration`: Absolute maximum duration (seconds) from the first start-marker to send, even if lines keep arriving. Prevents runaway packets when the end-marker is missing. Default: 30.0
 - `--strip-nulls`: Remove null bytes (\x00) before processing
-- `--cooldown`: Cooldown period (seconds) after sending a packet during which incoming data is ignored. Helps prevent duplicate messages. Default: 0.0 (disabled)
+- `--cooldown`: Cooldown period (seconds) after sending a packet during which incoming data is ignored. Helps prevent duplicate messages. Default: 120.0
 
 **How detection works:**
-- Start when a line contains the start marker (default `AT+WOPEN`).
-- Collect all subsequent lines until a line contains the end marker (default `AT+CMGR`).
+- Start when a line contains the start marker (default `AT+CMGS`).
+- Collect all subsequent lines until a line contains the end marker (default `ATH`).
 - If a new start marker appears mid-collection, reset the buffer to avoid mixing packets.
 - Idle timeout (`--packet-timeout`): if no new lines arrive while collecting for N seconds, send the partial packet.
 - Max duration (`--max-packet-duration`): absolute cap from first start; send even if lines keep arriving.
 - Optional sanitization: `--strip-nulls` removes `\x00` before decoding/processing.
 
 **Cooldown mechanism:**
-- After a packet is successfully sent, a cooldown period begins if configured (configurable via `--cooldown`).
+- After a packet is successfully sent, a cooldown period begins (configurable via `--cooldown`).
 - During the cooldown period, all incoming serial data is dropped and ignored.
 - This prevents duplicate messages that sometimes occur when serial data arrives twice.
 - The cooldown applies to all packet send scenarios: normal completion, idle timeout, and max duration.
 - When `--debug` is enabled, dropped data is logged with remaining cooldown time.
-- Cooldown is disabled by default (0.0). Enable it by setting `--cooldown` to a positive value (e.g., 2.0 for 2 seconds).
+- Cooldown is enabled by default (120.0 seconds). Disable it by setting `--cooldown` to 0.
 
 **Webhook payload:**
 The script posts JSON to the webhook:
@@ -97,8 +97,13 @@ Send test data to a serial port for testing purposes.
 
 **Usage:**
 ```bash
-python send_test_data.py --serial-port /dev/ttyUSB1 --baudrate 9600
+python send_test_data.py --serial-port /dev/ttyUSB1 --baudrate 9600 --delay 0.1
 ```
+
+**Arguments:**
+- `--serial-port`: Serial port to write to. Default: /dev/ttyUSB0
+- `--baudrate`: Baud rate for serial connection. Default: 9600
+- `--delay`: Delay between sending each line in seconds. Default: 0.1
 
 ## Testing with Virtual Serial Ports
 
@@ -230,3 +235,101 @@ Two common ways to connect the Raspberry Pi to the vending machine's serial inte
 	sudo usermod -a -G dialout $USER
 	# Log out and back in
 	```
+
+## Running as a Systemd Service
+
+For production deployment, run the script as a systemd service with credentials stored securely in an environment file.
+
+### 1. Create the environment file
+
+Store your webhook URL and credentials in `/etc/vendpi.env`:
+
+```bash
+sudo nano /etc/vendpi.env
+```
+
+Add your configuration:
+```
+WEBHOOK_URL=https://your-webhook.url
+VENDPI_USERNAME=your_username
+VENDPI_PASSWORD=your_password
+```
+
+### 2. Secure the environment file
+
+Restrict access to root only:
+```bash
+sudo chown root:root /etc/vendpi.env
+sudo chmod 600 /etc/vendpi.env
+```
+
+### 3. Create the service file
+
+Create the systemd service unit:
+```bash
+sudo nano /etc/systemd/system/vendpi.service
+```
+
+Add the following configuration:
+```ini
+[Unit]
+Description=VendPi Webhook Service
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=pi
+EnvironmentFile=/etc/vendpi.env
+Restart=always
+RestartSec=10
+ExecStart=/usr/bin/python3 /home/pi/VendPi/webrequest_send.py \
+  --url ${WEBHOOK_URL} \
+  --username ${VENDPI_USERNAME} \
+  --password ${VENDPI_PASSWORD} \
+  --serial-port /dev/ttyUSB1 \
+  --baudrate 9600 \
+  --cooldown 120
+
+# --- Security hardening ---
+NoNewPrivileges=yes
+ProtectSystem=strict
+PrivateTmp=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+ReadOnlyPaths=/home/pi/VendPi
+LogsDirectory=vendpi
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 4. Enable and start the service
+
+```bash
+# Reload systemd to pick up the new service
+sudo systemctl daemon-reload
+
+# Enable the service to start on boot
+sudo systemctl enable vendpi.service
+
+# Start the service
+sudo systemctl start vendpi.service
+```
+
+### 5. Managing the service
+
+```bash
+# Check service status
+sudo systemctl status vendpi.service
+
+# View logs
+sudo journalctl -u vendpi.service -f
+
+# Restart the service
+sudo systemctl restart vendpi.service
+
+# Stop the service
+sudo systemctl stop vendpi.service
+```
