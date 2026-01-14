@@ -315,6 +315,7 @@ RestartSec=10
 ExecStart=/usr/bin/python3 /home/pi/VendPi/webrequest_send.py \
   --serial-port /dev/ttyUSB1 \
   --baudrate 9600 \
+  --debug \
   --cooldown 120
 
 # --- Security hardening ---
