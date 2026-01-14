@@ -83,6 +83,19 @@ def main():
         cred_source = "environment variables" if os.environ.get('VENDPI_USERNAME') else "command line arguments"
         logging.info(f"Using HTTP Basic Authentication (credentials from {cred_source})")
 
+    # Log startup configuration summary
+    logging.info("=== VendPi Configuration ===")
+    logging.info(f"Serial port: {args.serial_port} @ {args.baudrate} baud")
+    logging.info(f"Start marker: '{args.start_marker}'")
+    logging.info(f"End marker: '{args.end_marker}'")
+    logging.info(f"Packet timeout: {args.packet_timeout}s")
+    logging.info(f"Max packet duration: {args.max_packet_duration}s")
+    logging.info(f"Cooldown: {args.cooldown}s")
+    logging.info(f"Strip nulls: {args.strip_nulls}")
+    logging.info(f"Debug mode: {args.debug}")
+    logging.info(f"SSL verification: {not args.insecure}")
+    logging.info("============================")
+
     try:
         ser = serial.Serial(
             port=args.serial_port, 
