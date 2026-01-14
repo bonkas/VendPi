@@ -139,6 +139,32 @@ You can test the scripts without physical hardware using virtual serial port pai
 
 The data sent to `/dev/pts/3` will appear on `/dev/pts/2` and be processed by your script.
 
+### Testing with systemd service
+
+When testing virtual serial ports with the systemd service, you may encounter a permission denied error:
+
+```
+ERROR - Failed to open serial port: [Errno 13] could not open port /dev/pts/8: [Errno 13] Permission denied
+```
+
+**Why this happens:** Virtual serial ports created by socat are owned by the user who ran socat, with restricted permissions. The systemd service runs as the `pi` user, which doesn't have access to these ports by default.
+
+**Solution:** Create the virtual ports with explicit user, group, and permissions:
+
+```bash
+socat -d -d pty,raw,echo=0,user=pi,group=dialout,mode=660 pty,raw,echo=0,user=pi,group=dialout,mode=660
+```
+
+This creates both ports with:
+- Owner: `pi`
+- Group: `dialout`
+- Permissions: `660` (read/write for owner and group)
+
+Then update your service to use the virtual port and restart:
+```bash
+sudo systemctl restart vendpi.service
+```
+
 ### Alternative: Direct bash testing
 
 You can also send test data directly using bash:
