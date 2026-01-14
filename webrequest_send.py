@@ -18,6 +18,7 @@ import sys
 import argparse
 import logging
 import signal
+import os
 from datetime import datetime, timezone
 import json
 from requests.auth import HTTPBasicAuth
@@ -63,7 +64,15 @@ def parse_arguments():
 def main():
     args = parse_arguments()
 
-    auth = HTTPBasicAuth(args.username, args.password) if args.username and args.password else None
+    # Check environment variables first, fall back to CLI args
+    username = os.environ.get('VENDPI_USERNAME') or args.username
+    password = os.environ.get('VENDPI_PASSWORD') or args.password
+
+    auth = HTTPBasicAuth(username, password) if username and password else None
+
+    if auth:
+        source = "environment variables" if os.environ.get('VENDPI_USERNAME') else "command line arguments"
+        logging.info(f"Using HTTP Basic Authentication (credentials from {source})")
 
     try:
         ser = serial.Serial(
