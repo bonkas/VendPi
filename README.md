@@ -262,6 +262,84 @@ Two common ways to connect the Raspberry Pi to the vending machine's serial inte
 	# Log out and back in
 	```
 
+## Persistent Device Name with udev Rules
+
+USB-to-serial adapters can appear as `/dev/ttyUSB0`, `/dev/ttyUSB1`, etc., depending on the order they're detected or which USB port is used. A udev rule creates a consistent symlink (e.g., `/dev/vendpi`) that always points to your adapter.
+
+### 1. Find your device attributes
+
+Plug in your USB-to-serial adapter and identify it:
+```bash
+ls -la /dev/ttyUSB*
+```
+
+Get the device attributes (replace `ttyUSB0` with your device):
+```bash
+udevadm info -a -n /dev/ttyUSB0 | grep -E '{idVendor}|{idProduct}|{serial}|{manufacturer}|{product}'
+```
+
+Example output:
+```
+ATTRS{idProduct}=="23a3"
+ATTRS{idVendor}=="067b"
+ATTRS{manufacturer}=="Prolific Technology Inc. "
+ATTRS{product}=="USB-Serial Controller "
+ATTRS{serial}=="BXDYb119D15"
+```
+
+Note the `idVendor`, `idProduct`, and `serial` values for your adapter.
+
+### 2. Create the udev rule
+
+Create the rule file:
+```bash
+sudo nano /etc/udev/rules.d/99-vendpi.rules
+```
+
+Add this rule (replace the values with your adapter's attributes):
+```
+# VendPi USB-to-Serial adapter (Prolific/Unitek BF-810Y)
+# Creates symlink /dev/vendpi for consistent device naming
+SUBSYSTEM=="tty", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="23a3", ATTRS{serial}=="BXDYb119D15", SYMLINK+="vendpi", MODE="0660", GROUP="dialout"
+```
+
+**Rule breakdown:**
+- `SUBSYSTEM=="tty"` - Only matches serial/tty devices
+- `ATTRS{idVendor}` / `ATTRS{idProduct}` - Matches your specific adapter model
+- `ATTRS{serial}` - Matches this exact adapter (useful if you have multiple of the same model)
+- `SYMLINK+="vendpi"` - Creates `/dev/vendpi` symlink
+- `MODE="0660"` - Sets read/write permissions for owner and group
+- `GROUP="dialout"` - Assigns to dialout group for user access
+
+### 3. Apply and test the rule
+
+```bash
+# Reload udev rules
+sudo udevadm control --reload-rules
+
+# Trigger rules for existing devices
+sudo udevadm trigger
+
+# Verify the symlink
+ls -la /dev/vendpi
+```
+
+Expected output:
+```
+lrwxrwxrwx 1 root root 7 Jan 15 12:00 /dev/vendpi -> ttyUSB0
+```
+
+### 4. Test persistence
+
+Unplug and replug the adapter, or plug it into a different USB port. The `/dev/vendpi` symlink should always point to your adapter.
+
+### 5. Update your scripts and services
+
+Use `/dev/vendpi` instead of `/dev/ttyUSB0` or `/dev/ttyUSB1`:
+```bash
+python webrequest_send.py --url https://webhook.url --serial-port /dev/vendpi --baudrate 9600
+```
+
 ## Running as a Systemd Service
 
 For production deployment, run the script as a systemd service with credentials stored securely in an environment file.
@@ -313,7 +391,7 @@ EnvironmentFile=/etc/vendpi.env
 Restart=always
 RestartSec=10
 ExecStart=/usr/bin/python3 /home/pi/VendPi/webrequest_send.py \
-  --serial-port /dev/ttyUSB1 \
+  --serial-port /dev/vendpi \
   --baudrate 9600 \
   --debug \
   --cooldown 120
@@ -362,7 +440,7 @@ sudo systemctl stop vendpi.service
 
 ## To-Do / Future Enhancements
 
-- [ ] **Persistent device name with udev rules** - Create a udev rule to give the USB-to-serial adapter a consistent symlink (e.g., `/dev/vendpi`) regardless of which USB port it's plugged into. This prevents issues when the device enumerates as `/dev/ttyUSB0` vs `/dev/ttyUSB1`.
+- [x] **Persistent device name with udev rules** - Create a udev rule to give the USB-to-serial adapter a consistent symlink (e.g., `/dev/vendpi`) regardless of which USB port it's plugged into. See [Persistent Device Name with udev Rules](#persistent-device-name-with-udev-rules).
 
 - [ ] **Auto-detection of serial port** - Use `pyserial`'s `serial.tools.list_ports` module to automatically find the correct serial adapter by vendor ID, product ID, or description, rather than requiring a hardcoded device path.
 
