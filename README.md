@@ -455,6 +455,4 @@ printf "AT+WOPEN=0\r\nATE0\r\nAT\r\nAT+CMGS=<redacted>\r\n07/11/25 - 14:40\r\nSN
 
 - [x] **Persistent device name with udev rules** - Create a udev rule to give the USB-to-serial adapter a consistent symlink (e.g., `/dev/vendpi`) regardless of which USB port it's plugged into. See [Persistent Device Name with udev Rules](#persistent-device-name-with-udev-rules).
 
-- [ ] **Auto-detection of serial port** - Use `pyserial`'s `serial.tools.list_ports` module to automatically find the correct serial adapter by vendor ID, product ID, or description, rather than requiring a hardcoded device path.
-
 - [ ] **Reconnection on disconnect** - Add logic to detect when the USB-to-serial adapter is unplugged and automatically reconnect when it's plugged back in, rather than requiring a service restart.
