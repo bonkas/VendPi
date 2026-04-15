@@ -38,6 +38,17 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
+def open_serial_port(args):
+    ser = serial.Serial(
+        port=args.serial_port,
+        baudrate=args.baudrate,
+        timeout=0.1,
+        rtscts=False,
+        dsrdtr=False
+    )
+    logging.info(f"Opened serial port {args.serial_port} at {args.baudrate} baud.")
+    return ser
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Read from a serial port and send captured packets as POST requests.')
     parser.add_argument('--url', help='The URL to send POST requests to. Can also be set via WEBHOOK_URL environment variable.')
@@ -97,14 +108,7 @@ def main():
     logging.info("============================")
 
     try:
-        ser = serial.Serial(
-            port=args.serial_port, 
-            baudrate=args.baudrate, 
-            timeout=0.1,
-            rtscts=False,
-            dsrdtr=False
-        )
-        logging.info(f"Opened serial port {args.serial_port} at {args.baudrate} baud.")
+        ser = open_serial_port(args)
         if args.debug:
             logging.info(f"[DEBUG] Port settings - timeout: {ser.timeout}, rtscts: {ser.rtscts}, dsrdtr: {ser.dsrdtr}")
     except SerialException as e:
@@ -289,8 +293,26 @@ def main():
         except RequestException as e:
             logging.error(f"HTTP request failed: {e}")
 
-        except SerialException as e:
-            logging.error(f"Serial communication error: {e}")
+        except (SerialException, OSError) as e:
+            logging.error(f"Serial error: {e}")
+            try:
+                ser.close()
+            except Exception:
+                pass
+            buffer = []
+            collecting = False
+            started_at = None
+            last_activity = None
+            backoff = 2.0
+            while True:
+                logging.info(f"Attempting to reopen {args.serial_port} in {backoff:.0f}s...")
+                time.sleep(backoff)
+                try:
+                    ser = open_serial_port(args)
+                    break
+                except SerialException as reconnect_err:
+                    logging.error(f"Reconnect failed: {reconnect_err}")
+                    backoff = min(backoff * 2, 60.0)
 
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
